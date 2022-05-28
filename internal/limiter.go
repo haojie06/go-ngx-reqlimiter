@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"regexp"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -28,7 +29,7 @@ func NewReqLimiter(addr string, r float64, b int) *ReqLimiter {
 		b:          b,
 		addr:       addr,
 	}
-	if err := rl.setupIPT(); err != nil {
+	if err := rl.SetupIPT(); err != nil {
 		fmt.Printf("failed to set up iptables: %s", err.Error())
 		os.Exit(1)
 	}
@@ -36,7 +37,9 @@ func NewReqLimiter(addr string, r float64, b int) *ReqLimiter {
 }
 
 func (r *ReqLimiter) Start() {
-	fmt.Println("start limiter")
+	interruptC := make(chan os.Signal, 1)
+	signal.Notify(interruptC, os.Interrupt)
+
 	ngxReg, err := regexp.Compile(ngxRegexpStr)
 	if err != nil {
 		panic(err.Error())
@@ -46,7 +49,18 @@ func (r *ReqLimiter) Start() {
 		panic(err.Error())
 	}
 	go r.record(ngxReg, sysLogChan)
-	sysLogServer.Wait()
+	log.Println("ReqLimiter started")
+	for {
+		select {
+		case <-interruptC:
+			log.Println("ReqLimiter stopped")
+			sysLogServer.Kill()
+			r.ClearIPT()
+			os.Exit(0)
+			// TODO GET CLI INPUT
+			// TODO Record BAN IP TO FILE
+		}
+	}
 }
 
 func (r *ReqLimiter) addIP(ip string) *rate.Limiter {
@@ -79,7 +93,7 @@ func (r *ReqLimiter) record(ngxReg *regexp.Regexp, lc syslog.LogPartsChannel) {
 	}
 }
 
-func (r *ReqLimiter) setupIPT() error {
+func (r *ReqLimiter) SetupIPT() error {
 	var err error
 	var exist bool
 	if r.ipt, err = iptables.New(); err != nil {
@@ -101,4 +115,8 @@ func (r *ReqLimiter) setupIPT() error {
 		return err
 	}
 	return nil
+}
+
+func (r *ReqLimiter) ClearIPT() error {
+	return r.ipt.ClearChain("filter", "ngx-reqlimiter")
 }
