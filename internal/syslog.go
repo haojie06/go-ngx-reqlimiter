@@ -15,8 +15,12 @@ func StartSysServer(addr string, onlyUnixSocket bool) (*syslog.Server, syslog.Lo
 
 	server.ListenUnixgram("/var/run/go-ngx-limiter.sock")
 	if !onlyUnixSocket {
-		server.ListenTCP(addr)
-		server.ListenUDP(addr)
+		if err := server.ListenTCP(addr); err != nil {
+			return nil, nil, err
+		}
+		if err := server.ListenUDP(addr); err != nil {
+			return nil, nil, err
+		}
 		log.Printf("Listening on %s and /var/run/go-ngx-limiter.sock\n", addr)
 	} else {
 		log.Printf("Listening on /var/run/go-ngx-limiter.sock\n")

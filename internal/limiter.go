@@ -32,7 +32,7 @@ func NewReqLimiter(addr string, onlyUnixSocket bool, r float64, b int) *ReqLimit
 		onlyUnixSocket: onlyUnixSocket,
 	}
 	if err := rl.SetupIPT(); err != nil {
-		fmt.Printf("failed to set up iptables: %s", err.Error())
+		log.Printf("Failed to set up iptables: %s\n", err.Error())
 		os.Exit(1)
 	}
 	return rl
@@ -45,11 +45,13 @@ func (r *ReqLimiter) Start() {
 
 	ngxReg, err := regexp.Compile(ngxRegexpStr)
 	if err != nil {
-		panic(err.Error())
+		log.Println(err.Error())
+		os.Exit(1)
 	}
 	sysLogServer, sysLogChan, err := StartSysServer(r.addr, r.onlyUnixSocket)
 	if err != nil {
-		panic(err.Error())
+		log.Println(err.Error())
+		os.Exit(1)
 	}
 	go r.record(ngxReg, sysLogChan)
 	for {
