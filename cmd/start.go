@@ -11,17 +11,21 @@ import (
 
 // startCmd represents the start command
 var (
-	rate  float64
-	burst int
-	ip    string
-	port  string
+	rate           *float64
+	burst          *int
+	ip             *string
+	port           *string
+	onlyUnixSocket *bool
 )
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Nginx request rate limiter",
-	Long:  `An nginx request rate limiter depends on ip.`,
+	Long: `An nginx request rate limiter depends on ip.
+Add "access_log syslog:server=unix:/var/run/go-ngx-limiter.sock" to your nginx config file to make it work.
+All rules are append to the ngx-reqlimiter CHAIN in filter table, which will be cleared when exit.
+	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		limiter := internal.NewReqLimiter(ip+":"+port, rate, burst)
+		limiter := internal.NewReqLimiter(*ip+":"+*port, *onlyUnixSocket, *rate, *burst)
 		limiter.Start()
 	},
 }
@@ -38,8 +42,9 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	startCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	rate = *startCmd.Flags().Float64P("rate", "r", 50, "rate limit")
-	burst = *startCmd.Flags().IntP("burst", "b", 100, "rate burst")
-	ip = *startCmd.Flags().StringP("ip", "i", "127.0.0.1", "bind ip")
-	port = *startCmd.Flags().StringP("port", "p", "514", "bind port")
+	rate = startCmd.Flags().Float64P("rate", "r", 50, "Rate limit")
+	burst = startCmd.Flags().IntP("burst", "b", 100, "Rate burst")
+	ip = startCmd.Flags().StringP("ip", "i", "127.0.0.1", "Bind ip")
+	port = startCmd.Flags().StringP("port", "p", "514", "Bind port")
+	onlyUnixSocket = startCmd.Flags().BoolP("unix-only", "u", false, "Using unix socket only")
 }

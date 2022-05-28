@@ -15,19 +15,21 @@ import (
 const ngxRegexpStr = `^((?:[0-9]{1,3}\.){3}[0-9]{1,3})\s-\s-\s\[(.+)\]\s\"([A-Z]+)\s(\S+)\s([^\"\s]+)\"\s(\d+)\s(\d+)\s\"(.+)\"\s\"(.+)\"`
 
 type ReqLimiter struct {
-	limiterMap map[string]*rate.Limiter
-	r          rate.Limit
-	b          int
-	addr       string
-	ipt        *iptables.IPTables
+	limiterMap     map[string]*rate.Limiter
+	r              rate.Limit
+	b              int
+	addr           string
+	onlyUnixSocket bool
+	ipt            *iptables.IPTables
 }
 
-func NewReqLimiter(addr string, r float64, b int) *ReqLimiter {
+func NewReqLimiter(addr string, onlyUnixSocket bool, r float64, b int) *ReqLimiter {
 	rl := &ReqLimiter{
-		limiterMap: make(map[string]*rate.Limiter),
-		r:          rate.Limit(r),
-		b:          b,
-		addr:       addr,
+		limiterMap:     make(map[string]*rate.Limiter),
+		r:              rate.Limit(r),
+		b:              b,
+		addr:           addr,
+		onlyUnixSocket: onlyUnixSocket,
 	}
 	if err := rl.SetupIPT(); err != nil {
 		fmt.Printf("failed to set up iptables: %s", err.Error())
@@ -37,6 +39,7 @@ func NewReqLimiter(addr string, r float64, b int) *ReqLimiter {
 }
 
 func (r *ReqLimiter) Start() {
+	log.Printf("ReqLimiter is starting...\nRate limit(per second): %f\nBurst: %d\n", r.r, r.b)
 	interruptC := make(chan os.Signal, 1)
 	signal.Notify(interruptC, os.Interrupt)
 
@@ -44,16 +47,15 @@ func (r *ReqLimiter) Start() {
 	if err != nil {
 		panic(err.Error())
 	}
-	sysLogServer, sysLogChan, err := StartSysServer(r.addr)
+	sysLogServer, sysLogChan, err := StartSysServer(r.addr, r.onlyUnixSocket)
 	if err != nil {
 		panic(err.Error())
 	}
 	go r.record(ngxReg, sysLogChan)
-	log.Println("ReqLimiter started")
 	for {
 		select {
 		case <-interruptC:
-			log.Println("ReqLimiter stopped")
+			log.Println("ReqLimiter stopped, clear the chain...")
 			sysLogServer.Kill()
 			r.ClearIPT()
 			os.Exit(0)
@@ -80,8 +82,8 @@ func (r *ReqLimiter) record(ngxReg *regexp.Regexp, lc syslog.LogPartsChannel) {
 		rMap := ngxReg.FindStringSubmatch(fmt.Sprintf("%s", logParts["content"]))
 		limiter := r.getLimiter(rMap[1])
 		if !limiter.Allow() {
-			// TODO custom ports
-			log.Println("too many request, ban", rMap[1])
+
+			log.Println("Too many requests, ban", rMap[1])
 			err1 := r.ipt.AppendUnique("filter", "ngx-reqlimiter", "-s", rMap[1], "--match", "multiport", "-p", "tcp", "--dports", "80,443", "-j", "DROP")
 			err2 := r.ipt.AppendUnique("filter", "ngx-reqlimiter", "-s", rMap[1], "--match", "multiport", "-p", "udp", "--dports", "80,443", "-j", "DROP")
 			if err1 != nil || err2 != nil {

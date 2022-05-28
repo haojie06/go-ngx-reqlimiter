@@ -18,7 +18,10 @@ var cfgFile string
 var rootCmd = &cobra.Command{
 	Use:   "go-ngx-reqlimiter",
 	Short: "Nginx request rate limiter",
-	Long: `An nginx request rate limiter depends on ip.`,
+	Long: `An nginx request rate limiter depends on ip.
+Add "access_log syslog:server=unix:/var/run/go-ngx-limiter.sock" to your nginx config file to make it work.
+All rules are append to the ngx-reqlimiter chain in filter table, which will be cleared when exit.
+	`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
