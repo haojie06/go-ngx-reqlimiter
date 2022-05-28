@@ -2,6 +2,8 @@ package internal
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"regexp"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -15,17 +17,20 @@ type ReqLimiter struct {
 	limiterMap map[string]*rate.Limiter
 	r          rate.Limit
 	b          int
+	addr       string
 	ipt        *iptables.IPTables
 }
 
-func NewReqLimiter(r rate.Limit, b int) *ReqLimiter {
+func NewReqLimiter(addr string, r float64, b int) *ReqLimiter {
 	rl := &ReqLimiter{
 		limiterMap: make(map[string]*rate.Limiter),
-		r:          r,
+		r:          rate.Limit(r),
 		b:          b,
+		addr:       addr,
 	}
 	if err := rl.setupIPT(); err != nil {
-		panic(err.Error())
+		fmt.Printf("failed to set up iptables: %s", err.Error())
+		os.Exit(1)
 	}
 	return rl
 }
@@ -36,7 +41,7 @@ func (r *ReqLimiter) Start() {
 	if err != nil {
 		panic(err.Error())
 	}
-	sysLogServer, sysLogChan, err := StartSysServer("127.0.0.1", "1514")
+	sysLogServer, sysLogChan, err := StartSysServer(r.addr)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -61,31 +66,39 @@ func (r *ReqLimiter) record(ngxReg *regexp.Regexp, lc syslog.LogPartsChannel) {
 	for logParts := range lc {
 		// 正则提取出各字段
 		rMap := ngxReg.FindStringSubmatch(fmt.Sprintf("%s", logParts["content"]))
-		fmt.Println(rMap[1])
 		limiter := r.getLimiter(rMap[1])
 		if !limiter.Allow() {
-			r.ipt.AppendUnique("filter", "ngx-reqlimiter", "-s", rMap[1], "--dport", "-p", "tcp", "80,443", "-j", "DROP")
-			r.ipt.AppendUnique("filter", "ngx-reqlimiter", "-s", rMap[1], "--dport", "-p", "udp", "80,443", "-j", "DROP")
-			fmt.Println("too many request", rMap[1])
+			// TODO custom ports
+			log.Println("too many request, ban", rMap[1])
+			err1 := r.ipt.AppendUnique("filter", "ngx-reqlimiter", "-s", rMap[1], "--match", "multiport", "-p", "tcp", "--dports", "80,443", "-j", "DROP")
+			err2 := r.ipt.AppendUnique("filter", "ngx-reqlimiter", "-s", rMap[1], "--match", "multiport", "-p", "udp", "--dports", "80,443", "-j", "DROP")
+			if err1 != nil || err2 != nil {
+				log.Println("failed to ban", rMap[1])
+			}
 		}
 	}
 }
 
 func (r *ReqLimiter) setupIPT() error {
-	var ipt *iptables.IPTables
 	var err error
-	if ipt, err = iptables.New(); err != nil {
+	var exist bool
+	if r.ipt, err = iptables.New(); err != nil {
 		return err
 	}
-	if err = ipt.ClearAndDeleteChain("filter", "limiter"); err != nil {
+	if exist, err = r.ipt.ChainExists("filter", "ngx-reqlimiter"); err != nil {
 		return err
 	}
-	if err = r.ipt.NewChain("filter", "ngx-reqlimiter"); err != nil {
+	if exist {
+		if err = r.ipt.ClearChain("filter", "ngx-reqlimiter"); err != nil {
+			return err
+		}
+	} else {
+		if err = r.ipt.NewChain("filter", "ngx-reqlimiter"); err != nil {
+			return err
+		}
+	}
+	if err = r.ipt.AppendUnique("filter", "INPUT", "-j", "ngx-reqlimiter"); err != nil {
 		return err
 	}
-	if err = r.ipt.Insert("filter", "INPUT", 1, "-j", "ngx-reqlimiter"); err != nil {
-		return err
-	}
-	r.ipt = ipt
 	return nil
 }
