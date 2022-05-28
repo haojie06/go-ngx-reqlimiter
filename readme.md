@@ -26,13 +26,10 @@ Flags:
 ### TODOs
 
 - command when running
-
 - write ban record to file
-
 - support ipv6
-
 - custom restricted ports
-
 - config file
-
 - custom url weight
+- whitelist url
+- auto unban
