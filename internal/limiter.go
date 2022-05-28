@@ -57,8 +57,6 @@ func (r *ReqLimiter) Start() {
 			sysLogServer.Kill()
 			r.ClearIPT()
 			os.Exit(0)
-			// TODO GET CLI INPUT
-			// TODO Record BAN IP TO FILE
 		}
 	}
 }

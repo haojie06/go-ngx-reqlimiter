@@ -12,6 +12,7 @@ func StartSysServer(addr string) (*syslog.Server, syslog.LogPartsChannel, error)
 	server.SetFormat(syslog.RFC3164)
 	server.ListenTCP(addr)
 	server.ListenUDP(addr)
+	server.ListenUnixgram("./go-ngx-limiter.sock")
 
 	if err := server.Boot(); err != nil {
 		return nil, nil, err
