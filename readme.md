@@ -23,7 +23,7 @@ Flags:
   -u, --unix-only     only unix socket
 ``` 
 
-### TODO 
+### TODOs
 
 - command when running
 
