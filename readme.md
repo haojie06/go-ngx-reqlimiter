@@ -5,7 +5,7 @@
 edit the nginx config file and add the following line:
 
 ```conf
-access_log syslog:server=127.0.0.1:1514,facility=local7,tag=nginx,severity=info;
+access_log syslog:server=127.0.0.1:514
 or use the unix socket in the working directory
 access_log syslog:server=unix:/var/run/go-ngx-limiter.sock,facility=local7,tag=nginx,severity=info;
 ```
