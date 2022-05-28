@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.12.0
+	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	gopkg.in/mcuadros/go-syslog.v2 v2.3.0
 )
 
