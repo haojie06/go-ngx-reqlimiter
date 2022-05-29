@@ -2,12 +2,22 @@
 
 ### How to start
 
-edit the nginx config file and add the following line:
+edit the nginx config file and add the following lines:
 
 ```conf
-access_log syslog:server=127.0.0.1:514
-or use the unix socket in the working directory
-access_log syslog:server=unix:/var/run/go-ngx-limiter.sock,facility=local7,tag=nginx,severity=info;
+Add 
+
+log_format limiter '$remote_addr $request'; 
+
+Outside the server{}
+
+Add
+
+access_log syslog:server=127.0.0.1:514;
+
+access_log syslog:server=unix:/var/run/go-ngx-limiter.sock;   #or use the unix socket in the working directory
+
+Inside the server{}
 ```
 
 execute `./go-ngx-reqlimiter start` to start the limiter, use `-h` to see the options.
@@ -28,8 +38,6 @@ Flags:
 - command when running
 
 - write ban record to file
-
-- support ipv6
 
 - custom restricted ports
 
