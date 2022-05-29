@@ -4,11 +4,17 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
 	"golang.org/x/time/rate"
 	"gopkg.in/mcuadros/go-syslog.v2"
+)
+
+var (
+	ip6Regexp = regexp.MustCompile(`(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))`)
+	ip4Regexp = regexp.MustCompile(`((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)`)
 )
 
 type ReqLimiter struct {
@@ -18,6 +24,7 @@ type ReqLimiter struct {
 	addr           string
 	onlyUnixSocket bool
 	ipt            *iptables.IPTables
+	ip6t           *iptables.IPTables
 	ports          string
 }
 
@@ -78,8 +85,17 @@ func (r *ReqLimiter) record(lc syslog.LogPartsChannel) {
 		limiter := r.getLimiter(ls[0])
 		if !limiter.Allow() {
 			log.Println("Too many requests, ban", ls[0])
-			err1 := r.ipt.AppendUnique("filter", "NGX-REQLIMITER", "-s", ls[0], "--match", "multiport", "-p", "tcp", "--dports", r.ports, "-j", "DROP")
-			err2 := r.ipt.AppendUnique("filter", "NGX-REQLIMITER", "-s", ls[0], "--match", "multiport", "-p", "udp", "--dports", r.ports, "-j", "DROP")
+			// ip协议匹配
+			var err1, err2 error
+			if ip4Regexp.Match([]byte(ls[0])) {
+				err1 = r.ipt.AppendUnique("filter", "NGX-REQLIMITER", "-s", ls[0], "--match", "multiport", "-p", "tcp", "--dports", r.ports, "-j", "DROP")
+				err2 = r.ipt.AppendUnique("filter", "NGX-REQLIMITER", "-s", ls[0], "--match", "multiport", "-p", "udp", "--dports", r.ports, "-j", "DROP")
+			} else if ip6Regexp.Match([]byte(ls[0])) {
+				err1 = r.ip6t.AppendUnique("filter", "NGX-REQLIMITER", "-s", ls[0], "--match", "multiport", "-p", "tcp", "--dports", r.ports, "-j", "DROP")
+				err2 = r.ip6t.AppendUnique("filter", "NGX-REQLIMITER", "-s", ls[0], "--match", "multiport", "-p", "udp", "--dports", r.ports, "-j", "DROP")
+			} else {
+				log.Println("IP address is not valid:", ls[0])
+			}
 			if err1 != nil || err2 != nil {
 				log.Println("Failed to ban", ls[0], err1, err2)
 			}
@@ -90,6 +106,7 @@ func (r *ReqLimiter) record(lc syslog.LogPartsChannel) {
 func (r *ReqLimiter) SetupIPT() error {
 	var err error
 	var exist bool
+	// IPV4
 	if r.ipt, err = iptables.New(); err != nil {
 		return err
 	}
@@ -108,9 +125,30 @@ func (r *ReqLimiter) SetupIPT() error {
 	if err = r.ipt.AppendUnique("filter", "INPUT", "-j", "NGX-REQLIMITER"); err != nil {
 		return err
 	}
+
+	// IPV6
+	if r.ip6t, err = iptables.NewWithProtocol(iptables.ProtocolIPv6); err != nil {
+		return err
+	}
+	if exist, err = r.ip6t.ChainExists("filter", "NGX-REQLIMITER"); err != nil {
+		return err
+	}
+	if exist {
+		if err = r.ip6t.ClearChain("filter", "NGX-REQLIMITER"); err != nil {
+			return err
+		}
+	} else {
+		if err = r.ip6t.NewChain("filter", "NGX-REQLIMITER"); err != nil {
+			return err
+		}
+	}
+	if err = r.ip6t.AppendUnique("filter", "INPUT", "-j", "NGX-REQLIMITER"); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (r *ReqLimiter) ClearIPT() error {
-	return r.ipt.ClearChain("filter", "NGX-REQLIMITER")
+func (r *ReqLimiter) ClearIPT() {
+	r.ipt.ClearChain("filter", "NGX-REQLIMITER")
+	r.ip6t.ClearChain("filter", "NGX-REQLIMITER")
 }
