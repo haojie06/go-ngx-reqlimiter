@@ -2,7 +2,7 @@
 
 ### How to start
 
-edit the nginx config file and add the following lines:
+Edit the nginx config file and add the following lines:
 
 ```conf
 Add 
@@ -36,11 +36,9 @@ Flags:
 ### TODOs
 
 - command when running
-
 - write ban record to file
-
 - custom restricted ports
-
 - config file
-
 - custom url weight
+- whitelist url
+- auto unban
