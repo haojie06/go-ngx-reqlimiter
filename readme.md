@@ -11,7 +11,7 @@ log_format limiter '$remote_addr $request';
 
 # Outside the server{}
 
-#Add
+# Add
 
 access_log syslog:server=127.0.0.1:514 limiter;
 # or use the unix socket file
