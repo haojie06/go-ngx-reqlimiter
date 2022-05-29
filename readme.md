@@ -5,19 +5,19 @@
 Edit the nginx config file and add the following lines:
 
 ```conf
-Add 
+# Add 
 
 log_format limiter '$remote_addr $request'; 
 
-Outside the server{}
+# Outside the server{}
 
-Add
+#Add
 
 access_log syslog:server=127.0.0.1:514 limiter;
+# or use the unix socket file
+access_log syslog:server=unix:/var/run/go-ngx-limiter.sock limiter;   
 
-access_log syslog:server=unix:/var/run/go-ngx-limiter.sock limiter;   #or use the unix socket in the working directory
-
-Inside the server{}
+# Inside the server{}
 ```
 
 execute `./go-ngx-reqlimiter start` to start the limiter, use `-h` to see the options.
