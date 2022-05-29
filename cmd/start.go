@@ -16,10 +16,11 @@ var (
 	ip             *string
 	port           *string
 	onlyUnixSocket *bool
+	ports          *string
 )
 var startCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Nginx request rate limiter",
+	Short: "Start nginx request rate limiter",
 	Long: `An nginx request rate limiter depends on ip.
 Add 
 	log_format limiter '$remote_addr $request';
@@ -28,7 +29,7 @@ to your nginx config file to make it work.
 All rules are appended to the NGX-REQLIMITER CHAIN in filter table, which will be cleared when exit.
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		limiter := internal.NewReqLimiter(*ip+":"+*port, *onlyUnixSocket, *rate, *burst)
+		limiter := internal.NewReqLimiter(*ip+":"+*port, *onlyUnixSocket, *rate, *burst, *ports)
 		limiter.Start()
 	},
 }
@@ -50,4 +51,5 @@ func init() {
 	ip = startCmd.Flags().StringP("ip", "i", "127.0.0.1", "Bind ip")
 	port = startCmd.Flags().StringP("port", "p", "514", "Bind port")
 	onlyUnixSocket = startCmd.Flags().BoolP("unix-only", "u", false, "Using unix socket only")
+	ports = startCmd.Flags().StringP("ports", "", "80,443", "Ports to protect, separated by comma")
 }

@@ -18,15 +18,17 @@ type ReqLimiter struct {
 	addr           string
 	onlyUnixSocket bool
 	ipt            *iptables.IPTables
+	ports          string
 }
 
-func NewReqLimiter(addr string, onlyUnixSocket bool, r float64, b int) *ReqLimiter {
+func NewReqLimiter(addr string, onlyUnixSocket bool, r float64, b int, ports string) *ReqLimiter {
 	rl := &ReqLimiter{
 		limiterMap:     make(map[string]*rate.Limiter),
 		r:              rate.Limit(r),
 		b:              b,
 		addr:           addr,
 		onlyUnixSocket: onlyUnixSocket,
+		ports:          ports,
 	}
 	if err := rl.SetupIPT(); err != nil {
 		log.Printf("Failed to set up iptables: %s\n", err.Error())
@@ -76,12 +78,10 @@ func (r *ReqLimiter) record(lc syslog.LogPartsChannel) {
 		limiter := r.getLimiter(ls[0])
 		if !limiter.Allow() {
 			log.Println("Too many requests, ban", ls[0])
-			err1 := r.ipt.AppendUnique("filter", "NGX-REQLIMITER", "-s", ls[0], "--match", "multiport", "-p", "tcp", "--dports", "80,443", "-j", "DROP")
-			err2 := r.ipt.AppendUnique("filter", "NGX-REQLIMITER", "-s", ls[0], "--match", "multiport", "-p", "udp", "--dports", "80,443", "-j", "DROP")
+			err1 := r.ipt.AppendUnique("filter", "NGX-REQLIMITER", "-s", ls[0], "--match", "multiport", "-p", "tcp", "--dports", r.ports, "-j", "DROP")
+			err2 := r.ipt.AppendUnique("filter", "NGX-REQLIMITER", "-s", ls[0], "--match", "multiport", "-p", "udp", "--dports", r.ports, "-j", "DROP")
 			if err1 != nil || err2 != nil {
-				log.Println("failed to ban", ls[0], err1, err2)
-			} else {
-				log.Println("ban", ls[0])
+				log.Println("Failed to ban", ls[0], err1, err2)
 			}
 		}
 	}
