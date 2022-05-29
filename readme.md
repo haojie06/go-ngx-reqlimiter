@@ -25,13 +25,14 @@ execute `./go-ngx-reqlimiter start` to start the limiter, use `-h` to see the op
 
 ```
 Flags:
-  -b, --burst int     rate burst (default 100)
-  -h, --help          help for start
-  -i, --ip string     bind ip (default "127.0.0.1")
-  -p, --port string   bind port (default "514")
-  -r, --rate float    rate limit (default 50)
-  -t, --toggle        Help message for toggle
-  -u, --unix-only     only unix socket
+  -b, --burst int      Rate burst (default 100)
+  -h, --help           help for start
+  -i, --ip string      Bind ip (default "127.0.0.1")
+  -p, --port string    Bind port (default "514")
+      --ports string   Ports to protect, separated by comma (default "80,443")
+  -r, --rate float     Rate limit (default 50)
+  -t, --toggle         Help message for toggle
+  -u, --unix-only      Using unix socket only
 ``` 
 
 ### TODOs
