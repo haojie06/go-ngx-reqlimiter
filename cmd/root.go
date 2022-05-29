@@ -19,8 +19,11 @@ var rootCmd = &cobra.Command{
 	Use:   "go-ngx-reqlimiter",
 	Short: "Nginx request rate limiter",
 	Long: `An nginx request rate limiter depends on ip.
-Add "access_log syslog:server=unix:/var/run/go-ngx-limiter.sock" to your nginx config file to make it work.
-All rules are append to the ngx-reqlimiter chain in filter table, which will be cleared when exit.
+Add 
+	log_format limiter '$remote_addr $request';
+	access_log syslog:server=unix:/var/run/go-ngx-limiter.sock limiter;
+to your nginx config file to make it work.
+All rules are appended to the NGX-REQLIMITER CHAIN in filter table, which will be cleared when exit.
 	`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:

@@ -21,8 +21,11 @@ var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Nginx request rate limiter",
 	Long: `An nginx request rate limiter depends on ip.
-Add "access_log syslog:server=unix:/var/run/go-ngx-limiter.sock;" to your nginx config file to make it work.
-All rules are append to the ngx-reqlimiter CHAIN in filter table, which will be cleared when exit.
+Add 
+	log_format limiter '$remote_addr $request';
+	access_log syslog:server=unix:/var/run/go-ngx-limiter.sock limiter;
+to your nginx config file to make it work.
+All rules are appended to the NGX-REQLIMITER CHAIN in filter table, which will be cleared when exit.
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		limiter := internal.NewReqLimiter(*ip+":"+*port, *onlyUnixSocket, *rate, *burst)

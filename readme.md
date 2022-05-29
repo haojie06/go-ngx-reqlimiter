@@ -13,9 +13,9 @@ Outside the server{}
 
 Add
 
-access_log syslog:server=127.0.0.1:514;
+access_log syslog:server=127.0.0.1:514 limiter;
 
-access_log syslog:server=unix:/var/run/go-ngx-limiter.sock;   #or use the unix socket in the working directory
+access_log syslog:server=unix:/var/run/go-ngx-limiter.sock limiter;   #or use the unix socket in the working directory
 
 Inside the server{}
 ```
