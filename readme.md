@@ -43,3 +43,5 @@ Flags:
 - whitelist url
 - auto unban
 - ipv6 prefix match support
+- x-forward-for support
+- cloudflare api
