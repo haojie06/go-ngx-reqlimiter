@@ -21,7 +21,7 @@ access_log syslog:server=unix:/var/run/go-ngx-limiter.sock limiter;
 # Don't forget to use systemctl restart nginx to restart the nginx.
 ```
 
-execute `./go-ngx-reqlimiter start` to start the limiter, use `-h` to see the options.
+execute `./go-ngx-reqlimiter start -r 10 -b 100` to start the limiter, use `-h` to see the options.
 
 ```
 Flags:
